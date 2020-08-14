@@ -11,6 +11,7 @@ class JokeList extends Component {
       loading: false,
     };
     this.handleVotes = this.handleVotes.bind(this);
+    this.seenJokes = new Set(this.state.jokes.map((j) => j.text));
   }
   static defaultProps = {
     numJokesToGet: 10,
@@ -30,23 +31,33 @@ class JokeList extends Component {
     );
   }
   async getJokes() {
-    let jokes = [];
-    while (jokes.length < this.props.numJokesToGet) {
-      let res = await axios.get("https://icanhazdadjoke.com/", {
-        headers: {
-          Accept: "application/json",
-        },
-      });
-      jokes.push({ id: uuid(), text: res.data.joke, votes: 0 });
+    try {
+      let jokes = [];
+      while (jokes.length < this.props.numJokesToGet) {
+        let res = await axios.get("https://icanhazdadjoke.com/", {
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        let newJoke = res.data.joke;
+        if (!this.seenJokes.has(newJoke)) {
+          jokes.push({ id: uuid(), text: newJoke, votes: 0 });
+        } else {
+          console.log("Duplicate", newJoke);
+        }
+      }
+      this.setState(
+        (st) => ({
+          jokes: [...st.jokes, ...jokes],
+          loading: false,
+        }),
+        () =>
+          window.localStorage.setItem("jokes", JSON.stringify(this.state.jokes))
+      );
+    } catch (e) {
+      alert(e);
+      this.setState({ loading: false });
     }
-    this.setState(
-      (st) => ({
-        jokes: [...st.jokes, ...jokes],
-        loading: false,
-      }),
-      () =>
-        window.localStorage.setItem("jokes", JSON.stringify(this.state.jokes))
-    );
   }
   handleClick = () => {
     this.setState({ loading: true }, this.getJokes);
@@ -60,6 +71,8 @@ class JokeList extends Component {
         </div>
       );
     } else {
+      let jokes = this.state.jokes.sort((a, b) => b.votes - a.votes);
+
       return (
         <div className="JokeList">
           <div className="JokeList-sidebar">
@@ -71,11 +84,11 @@ class JokeList extends Component {
               alt="laughing emogi"
             ></img>
             <button onClick={this.handleClick} className="JokeList-getmore">
-              New Jokes
+              Fetch Jokes
             </button>
           </div>
           <div className="JokeList-jokes">
-            {this.state.jokes.map((j) => (
+            {jokes.map((j) => (
               <Joke
                 key={j.id}
                 votes={j.votes}
